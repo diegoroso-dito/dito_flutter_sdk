@@ -5,13 +5,15 @@ import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart';
 
 class DitoSDK {
+  String? _cpf;
+  String? _apiKey;
+  String? _secretKey;
   String? _userID;
   String? _name;
   String? _email;
   String? _gender;
   String? _birthday;
-  String? _registrationDate;
-  String? _city;
+  String? _location;
   Map<String, String>? _customData;
 
   static final DitoSDK _instance = DitoSDK._internal();
@@ -22,23 +24,30 @@ class DitoSDK {
 
   DitoSDK._internal();
 
-  void setUserId(String userID) {
-    _userID = userID;
+  void initialize({required String apiKey, required String secretKey}) {
+    _apiKey = apiKey;
+    _secretKey = secretKey;
   }
 
-  void deleteUserId() {
-    _userID = null;
+  String convertToSHA1(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha1.convert(bytes);
+
+    return digest.toString();
   }
 
   void identify({
+    String? cpf,
     String? name,
     String? email,
     String? gender,
     String? birthday,
-    String? registrationDate,
-    String? city,
+    String? location,
     Map<String, String>? customData,
   }) {
+    if (cpf != null) {
+      _cpf = cpf;
+    }
     if (name != null) {
       _name = name;
     }
@@ -51,51 +60,41 @@ class DitoSDK {
     if (birthday != null) {
       _birthday = birthday;
     }
-    if (registrationDate != null) {
-      _registrationDate = registrationDate;
-    }
-    if (city != null) {
-      _city = city;
+    if (location != null) {
+      _location = location;
     }
     if (customData != null) {
       _customData = customData;
     }
-    print("Identify: Name: $_name, Email: $_email, Custom Data: $_customData");
+
+    print("Identify registered!");
   }
 
-  void trackEvent(String eventName, Map<String, String>? properties) {
-    if (_userID != null) {
-      print("Tracking event $eventName with $properties for user $_userID");
-    } else {
-      print("UserID doesn't exist");
+  Future<void> registerUser() async {
+    if (_apiKey == null || _secretKey == null) {
+      throw Exception(
+          'As chaves de API e Secret Key não foram inicializadas. Chame o método initialize() primeiro.');
     }
-  }
 
-  String convertToSHA1(String input) {
-    final bytes = utf8.encode(input); // data being hashed
-    final digest = sha1.convert(bytes);
+    if (_cpf == null && _email == null) {
+      throw Exception(
+          'Você não cadastrou o minimo de informações com o identify.');
+    }
 
-    return digest.toString();
-  }
+    _userID = _cpf ?? convertToSHA1(_email!);
 
-  Future<void> _registerUser() async {
-    final secretKey = 'SECRET_KEY';
-    final apiKey = 'API_KEY';
-
-    final signature = convertToSHA1(secretKey);
+    final signature = convertToSHA1(_secretKey!);
 
     final params = {
-      'platform_api_key': apiKey,
+      'platform_api_key': _apiKey,
       'sha1_signature': signature,
-      'encoding': 'base64',
       'user_data': jsonEncode({
-        'name': '',
-        'email': '',
-        'gender': '',
-        'location': '',
-        'birthday': '',
-        'created_at': '',
-        'data': {} //customData
+        'name': _name,
+        'email': _email,
+        'gender': _gender,
+        'location': _location,
+        'birthday': _birthday,
+        'data': json.encode(_customData)
       }),
     };
 
@@ -108,12 +107,20 @@ class DitoSDK {
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},
     );
 
-    if (response.statusCode == 200) {
-      // Requisição bem-sucedida
+    if (response.statusCode == 201) {
+      // Requisição bem sucedida
       print("Requisição bem-sucedida: ${response.body}");
     } else {
       // Requisição com erro
       print("Erro na requisição: ${response.statusCode}");
     }
   }
+
+  // void trackEvent(String eventName, Map<String, String>? properties) {
+  //   if (_userID != null) {
+  //     print("Tracking event $eventName with $properties for user $_userID");
+  //   } else {
+  //     print("UserID doesn't exist");
+  //   }
+  // }
 }
