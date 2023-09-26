@@ -116,11 +116,48 @@ class DitoSDK {
     }
   }
 
-  // void trackEvent(String eventName, Map<String, String>? properties) {
-  //   if (_userID != null) {
-  //     print("Tracking event $eventName with $properties for user $_userID");
-  //   } else {
-  //     print("UserID doesn't exist");
-  //   }
-  // }
+  Future<void> trackEvent(
+      {required String eventName,
+      double? revenue,
+      Map<String, String>? properties}) async {
+    if (_apiKey == null || _secretKey == null) {
+      throw Exception(
+          'As chaves de API e Secret Key não foram inicializadas. Chame o método initialize() primeiro.');
+    }
+
+    _userID = _cpf ?? convertToSHA1(_email!);
+
+    if (_userID == null) {
+      throw Exception('Usuario não registrado.');
+    }
+
+    final signature = convertToSHA1(_secretKey!);
+
+    final params = {
+      'id_type': 'id',
+      'platform_api_key': _apiKey,
+      'sha1_signature': signature,
+      'encoding': 'base64',
+      'network_name': 'pt',
+      'event': jsonEncode(
+          {'action': eventName, 'revenue': revenue, 'data': properties})
+    };
+
+    final url =
+        Uri.parse("http://events.plataformasocial.com.br/users/$_userID");
+
+    final response = await http.post(
+      url,
+      body: params,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    );
+
+    if (response.statusCode == 201) {
+      // Requisição bem sucedida
+      print("Requisição bem-sucedida: ${response.body}");
+    } else {
+      // Requisição com erro
+      print("Erro na requisição: ${response.statusCode}");
+    }
+  }
 }
