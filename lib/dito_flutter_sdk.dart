@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart';
 
 class DitoSDK {
-  String? _cpf;
   String? _apiKey;
   String? _secretKey;
   String? _userID;
@@ -45,9 +44,6 @@ class DitoSDK {
     String? location,
     Map<String, String>? customData,
   }) {
-    if (cpf != null) {
-      _cpf = cpf;
-    }
     if (name != null) {
       _name = name;
     }
@@ -70,18 +66,24 @@ class DitoSDK {
     print("Identify registered!");
   }
 
-  Future<void> registerUser() async {
+  void setUserId(String userId) {
+    _userID = userId;
+  }
+
+  void _checkConfiguration() {
     if (_apiKey == null || _secretKey == null) {
       throw Exception(
-          'As chaves de API e Secret Key não foram inicializadas. Chame o método initialize() primeiro.');
+          'API key and Secret Key must be initialized before using. Please call the initialize() method first.');
     }
 
-    if (_cpf == null && _email == null) {
+    if (_userID == null) {
       throw Exception(
-          'Você não cadastrou o minimo de informações com o identify.');
+          'User registration is required. Please call the setUserId() method first.');
     }
+  }
 
-    _userID = _cpf ?? convertToSHA1(_email!);
+  Future<void> registerUser() async {
+    _checkConfiguration();
 
     final signature = convertToSHA1(_secretKey!);
 
@@ -119,17 +121,8 @@ class DitoSDK {
   Future<void> trackEvent(
       {required String eventName,
       double? revenue,
-      Map<String, String>? properties}) async {
-    if (_apiKey == null || _secretKey == null) {
-      throw Exception(
-          'As chaves de API e Secret Key não foram inicializadas. Chame o método initialize() primeiro.');
-    }
-
-    _userID = _cpf ?? convertToSHA1(_email!);
-
-    if (_userID == null) {
-      throw Exception('Usuario não registrado.');
-    }
+      Map<String, String>? customData}) async {
+    _checkConfiguration();
 
     final signature = convertToSHA1(_secretKey!);
 
@@ -140,7 +133,7 @@ class DitoSDK {
       'encoding': 'base64',
       'network_name': 'pt',
       'event': jsonEncode(
-          {'action': eventName, 'revenue': revenue, 'data': properties})
+          {'action': eventName, 'revenue': revenue, 'data': customData})
     };
 
     final url =
