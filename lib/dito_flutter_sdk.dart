@@ -1,10 +1,14 @@
 library dito_flutter_sdk;
 
+import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class DitoSDK {
+  String? _userAgent;
   String? _apiKey;
   String? _secretKey;
   String? _userID;
@@ -23,7 +27,7 @@ class DitoSDK {
 
   DitoSDK._internal();
 
-  void initialize({required String apiKey, required String secretKey}) {
+  void initialize({required String apiKey, required String secretKey}) async {
     _apiKey = apiKey;
     _secretKey = secretKey;
   }
@@ -70,6 +74,32 @@ class DitoSDK {
     _userID = userId;
   }
 
+  void setUserAgent(String userAgent) {
+    _userAgent = userAgent;
+  }
+
+  Future<String> _getUserAgent() async {
+    final deviceInfo = DeviceInfoPlugin();
+    final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+    final String version = packageInfo.version;
+    final String appName = packageInfo.appName;
+    String system;
+    String model;
+
+    if (Platform.isIOS) {
+      final ios = await deviceInfo.iosInfo;
+      system = 'iOS ${ios.systemVersion}';
+      model = ios.model;
+    } else {
+      final android = await deviceInfo.androidInfo;
+      system = 'Android ${android.version}';
+      model = android.model;
+    }
+
+    print('User-Agent $appName/$version ($system; $model)');
+    return '$appName/$version ($system; $model)';
+  }
+
   void _checkConfiguration() {
     if (_apiKey == null || _secretKey == null) {
       throw Exception(
@@ -103,10 +133,15 @@ class DitoSDK {
     final url = Uri.parse(
         "https://login.plataformasocial.com.br/users/portal/$_userID/signup");
 
+    final defaultUserAgent = await _getUserAgent();
+
     final response = await http.post(
       url,
       body: params,
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': _userAgent ?? defaultUserAgent,
+      },
     );
 
     if (response.statusCode == 201) {
@@ -139,10 +174,15 @@ class DitoSDK {
     final url =
         Uri.parse("http://events.plataformasocial.com.br/users/$_userID");
 
+    final defaultUserAgent = await _getUserAgent();
+
     final response = await http.post(
       url,
       body: params,
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': _userAgent ?? defaultUserAgent,
+      },
     );
 
     if (response.statusCode == 201) {
